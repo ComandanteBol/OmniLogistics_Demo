@@ -93,8 +93,40 @@ if menu == "📊 1. Command Center (Dashboard)":
 
 elif menu == "⚙️ 2. Motor de Costos (Smart Split)":
     st.markdown("<div class='titulo-principal'>Motor de Prorrateo Dinámico</div>", unsafe_allow_html=True)
-    st.warning("🚧 Módulo en construcción. Conecta los datos en el Dashboard primero.")
-
-elif menu == "🛡️ 3. Auditoría en la Nube":
-    st.markdown("<div class='titulo-principal'>Auditoría y Sincronización</div>", unsafe_allow_html=True)
-    st.warning("🚧 Módulo en construcción. Conecta los datos en el Dashboard primero.")
+    
+    if not url_input:
+        st.info("👈 Pega el enlace de tu Google Sheet público en la barra lateral para sincronizar el sistema.")
+    else:
+        with st.spinner("Procesando motor de cálculo..."):
+            df_cat, df_inv, df_op = leer_google_sheet_publico(url_input)
+            
+            if df_op is not None and not df_op.empty:
+                st.write("Simulación de distribución de costos logísticos por ruta y producto.")
+                
+                # Motor Matemático (Smart Split)
+                df_split = df_op.copy()
+                df_split['CANTIDAD'] = pd.to_numeric(df_split['CANTIDAD'], errors='coerce')
+                df_split['COSTO_OPERATIVO'] = pd.to_numeric(df_split['COSTO_OPERATIVO'], errors='coerce')
+                
+                df_split['COSTO_UNITARIO'] = df_split['COSTO_OPERATIVO'] / df_split['CANTIDAD']
+                
+                # Control dinámico para el usuario
+                st.markdown("<br>", unsafe_allow_html=True)
+                overhead = st.slider("⚙️ Ajuste de Carga Administrativa (Overhead %):", min_value=0, max_value=50, value=15, step=1)
+                
+                df_split['COSTO_TOTAL_AJUSTADO'] = df_split['COSTO_OPERATIVO'] * (1 + (overhead/100))
+                
+                # Formateo visual corporativo
+                columnas_mostrar = ['CONSECUTIVO', 'RUTA', 'PRODUCTO', 'CANTIDAD', 'COSTO_OPERATIVO', 'COSTO_UNITARIO', 'COSTO_TOTAL_AJUSTADO']
+                df_visual = df_split[columnas_mostrar].style.format({
+                    'COSTO_OPERATIVO': '${:,.2f}',
+                    'COSTO_UNITARIO': '${:,.2f}',
+                    'COSTO_TOTAL_AJUSTADO': '${:,.2f}'
+                })
+                
+                st.markdown("**Tabla de Distribución (Smart Split):**")
+                st.dataframe(df_visual, use_container_width=True, hide_index=True)
+                
+                st.success(f"✅ Prorrateo recalculado en milisegundos con un factor de overhead del {overhead}%.")
+            else:
+                st.warning("No hay datos operativos para calcular.")
