@@ -20,23 +20,18 @@ st.markdown("""
 @st.cache_data(ttl=60)
 def leer_google_sheet_publico(url):
     try:
-        # Extraer el ID del documento de la URL
         match = re.search(r'/d/([a-zA-Z0-9-_]+)', url)
         if not match: return None, None, None
         doc_id = match.group(1)
         
-        # Construir URLs de exportación CSV para las 3 pestañas (gid 0, 1 y 2 por defecto)
+        # header=1 le dice a Pandas que ignore la fila 0 ("TABLA: X") y use la fila 1 como encabezados reales
         url_catalogo = f"https://docs.google.com/spreadsheets/d/{doc_id}/export?format=csv&gid=0"
-        url_inventario = f"https://docs.google.com/spreadsheets/d/{doc_id}/export?format=csv&gid=1110052733" # Reemplazaremos los gid dinámicamente si falla
+        df_catalogo = pd.read_csv(url_catalogo, header=1)
         
-        # Leemos directo con Pandas
-        df_catalogo = pd.read_csv(url_catalogo)
-        
-        # Para el inventario y operaciones, forzamos lectura de las primeras hojas
         xls = pd.ExcelFile(f"https://docs.google.com/spreadsheets/d/{doc_id}/export?format=xlsx")
         hojas = xls.sheet_names
-        df_inv = pd.read_excel(xls, sheet_name=hojas[1]) if len(hojas) > 1 else pd.DataFrame()
-        df_oper = pd.read_excel(xls, sheet_name=hojas[2]) if len(hojas) > 2 else pd.DataFrame()
+        df_inv = pd.read_excel(xls, sheet_name=hojas[1], header=1) if len(hojas) > 1 else pd.DataFrame()
+        df_oper = pd.read_excel(xls, sheet_name=hojas[2], header=1) if len(hojas) > 2 else pd.DataFrame()
         
         return df_catalogo, df_inv, df_oper
     except Exception as e:
@@ -62,16 +57,16 @@ if menu == "📊 1. Command Center (Dashboard)":
     if not url_input:
         st.info("👈 Pega el enlace de tu Google Sheet público en la barra lateral para sincronizar el sistema.")
     else:
-        with st.spinner("Extrayendo datos de la bóveda..."):
+        with st.spinner("Extrayendo y limpiando datos de la bóveda..."):
             df_cat, df_inv, df_op = leer_google_sheet_publico(url_input)
             
             if df_cat is not None:
-                st.success("✅ Conexión establecida. Datos sincronizados en tiempo real.")
+                st.success("✅ Conexión establecida. Bóveda sincronizada en tiempo real.")
                 
-                # Cálculos rápidos para KPIs
-                total_lotes = len(df_inv) if not df_inv.empty else 0
+                # Cálculos reparados forzando números puros
                 total_mat = len(df_cat) if not df_cat.empty else 0
-                cant_total = df_inv['CANTIDAD_DISPONIBLE'].sum() if not df_inv.empty and 'CANTIDAD_DISPONIBLE' in df_inv.columns else 0
+                total_lotes = len(df_inv) if not df_inv.empty else 0
+                cant_total = pd.to_numeric(df_inv['CANTIDAD_DISPONIBLE'], errors='coerce').sum() if not df_inv.empty and 'CANTIDAD_DISPONIBLE' in df_inv.columns else 0
                 
                 c1, c2, c3, c4 = st.columns(4)
                 c1.markdown(f"<div class='kpi-card'><div class='kpi-title'>Materiales Activos</div><p class='kpi-value'>{total_mat}</p></div>", unsafe_allow_html=True)
@@ -79,13 +74,22 @@ if menu == "📊 1. Command Center (Dashboard)":
                 c3.markdown(f"<div class='kpi-card' style='border-left-color: #17a2b8;'><div class='kpi-title'>Volumen Total</div><p class='kpi-value'>{cant_total:,.2f}</p></div>", unsafe_allow_html=True)
                 c4.markdown(f"<div class='kpi-card' style='border-left-color: #dc3545;'><div class='kpi-title'>Alertas de Vencimiento</div><p class='kpi-value'>0</p></div>", unsafe_allow_html=True)
                 
-                st.markdown("### 📦 Inventario Global Sincronizado")
+                # Despliegue de las 3 tablas en formato corporativo
+                st.markdown("### 📦 Inventario Global")
                 if not df_inv.empty:
                     st.dataframe(df_inv, use_container_width=True, hide_index=True)
-                else:
-                    st.warning("No se encontraron datos de inventario.")
+                
+                col_a, col_b = st.columns(2)
+                with col_a:
+                    st.markdown("### 📋 Catálogo Maestro")
+                    if not df_cat.empty:
+                        st.dataframe(df_cat, use_container_width=True, hide_index=True)
+                with col_b:
+                    st.markdown("### 🚚 Registro de Operaciones")
+                    if not df_op.empty:
+                        st.dataframe(df_op, use_container_width=True, hide_index=True)
             else:
-                st.error("🚨 Error de conexión. Verifica que el enlace sea correcto y que el archivo tenga permisos de 'Cualquier persona con el enlace'.")
+                st.error("🚨 Error de conexión.")
 
 elif menu == "⚙️ 2. Motor de Costos (Smart Split)":
     st.markdown("<div class='titulo-principal'>Motor de Prorrateo Dinámico</div>", unsafe_allow_html=True)
