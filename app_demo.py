@@ -45,7 +45,8 @@ with st.sidebar:
     menu = st.radio("Módulos Operativos:", [
         "📊 1. Command Center (Dashboard)",
         "⚙️ 2. Motor de Costos (Smart Split)",
-        "🛡️ 3. Auditoría en la Nube"
+        "🛡️ 3. Auditoría en la Nube",
+        "📥 4. Ingesta y Limpieza Financiera"
     ])
     st.markdown("---")
     url_input = st.text_input("🔗 Conectar Base de Datos:", placeholder="Pega la URL de tu Google Sheet aquí...")
@@ -130,3 +131,68 @@ elif menu == "⚙️ 2. Motor de Costos (Smart Split)":
                 st.success(f"✅ Prorrateo recalculado en milisegundos con un factor de overhead del {overhead}%.")
             else:
                 st.warning("No hay datos operativos para calcular.")
+
+elif menu == "📥 4. Ingesta y Limpieza Financiera":
+    st.markdown("<div class='titulo-principal'>Motor de Limpieza y Reportes Gerenciales</div>", unsafe_allow_html=True)
+    st.write("Sube una sábana de Excel desordenada. El sistema la limpiará, cruzará bases de datos y generará reportes financieros y tablas dinámicas al instante.")
+
+    # Zona de carga de archivos
+    archivo_subido = st.file_uploader("📂 Sube tu archivo crudo (CSV o Excel)", type=['csv', 'xlsx'])
+
+    if st.button("🚀 Ejecutar Procesamiento Automático") or archivo_subido:
+        with st.spinner("Limpiando datos, conciliando información y armando reportes..."):
+            time.sleep(2) # Simulación de tiempo de cómputo
+
+            # 1. Simulación de una "sábana desordenada" (Dolor del cliente)
+            data_sucia = {
+                "FECHA_TX": [" 2026-08-01 ", "2026/08/02", "03-08-2026", "2026-08-04", " 2026-08-05 "],
+                "PROVEEDOR_SUCIO": ["AGROTECH llc.", "  chemcorp ", "MechSupplies", "Agrotech LLC", "CHEMCORP  "],
+                "CONCEPTO": ["Compra Insumos", "Mantenimiento", "Repuestos", "Flete", "Mantenimiento"],
+                "VALOR_USD": [" $ 1,500.50 ", "500", "  120.25 ", "$ 3,400.00", " 200 "],
+                "CATEGORIA": ["OPERATIVO", "GASTO", "GASTO", "OPERATIVO", "GASTO"]
+            }
+            df_raw = pd.DataFrame(data_sucia)
+
+            st.markdown("### ❌ 1. Sábana de Datos Original (Con Errores Comunes)")
+            st.dataframe(df_raw, use_container_width=True)
+
+            # 2. Proceso de Limpieza (La Magia de Python)
+            df_clean = df_raw.copy()
+            # Estandarización de texto
+            df_clean['PROVEEDOR_LIMPIO'] = df_clean['PROVEEDOR_SUCIO'].str.strip().str.upper().str.replace(".", "", regex=False)
+            # Limpieza financiera (quitando $ y comas)
+            df_clean['VALOR_USD'] = df_clean['VALOR_USD'].astype(str).str.replace('$', '', regex=False).str.replace(',', '', regex=False).str.strip().astype(float)
+            # Estandarización de fechas
+            df_clean['FECHA'] = pd.to_datetime(df_clean['FECHA_TX'], errors='coerce').dt.strftime('%Y-%m-%d')
+
+            st.markdown("### ✨ 2. Datos Limpios, Estructurados y Conciliados")
+            st.dataframe(df_clean[['FECHA', 'PROVEEDOR_LIMPIO', 'CONCEPTO', 'CATEGORIA', 'VALOR_USD']], use_container_width=True)
+
+            # 3. Reportes Gerenciales y Tablas Dinámicas
+            st.markdown("### 📊 3. Dashboard Financiero (Toma de Decisiones)")
+            
+            # KPIs Presupuestales
+            k1, k2, k3 = st.columns(3)
+            k1.metric("Gasto Operativo Total", f"${df_clean['VALOR_USD'].sum():,.2f}")
+            
+            proveedor_top = df_clean.groupby('PROVEEDOR_LIMPIO')['VALOR_USD'].sum().idxmax()
+            k2.metric("Principal Proveedor", proveedor_top)
+            k3.metric("Líneas Conciliadas", f"{len(df_clean)} registros")
+
+            col1, col2 = st.columns(2)
+
+            # Tabla dinámica por Proveedor
+            pivot_prov = pd.pivot_table(df_clean, values='VALOR_USD', index='PROVEEDOR_LIMPIO', aggfunc='sum').reset_index()
+            # Tabla dinámica por Categoría
+            pivot_cat = pd.pivot_table(df_clean, values='VALOR_USD', index='CATEGORIA', aggfunc='sum').reset_index()
+
+            with col1:
+                st.markdown("**Control de Gastos por Proveedor**")
+                st.dataframe(pivot_prov.style.format({'VALOR_USD': '${:,.2f}'}), use_container_width=True, hide_index=True)
+
+            with col2:
+                st.markdown("**Distribución por Categoría**")
+                # Gráfico de barras nativo de Streamlit
+                st.bar_chart(pivot_cat.set_index('CATEGORIA'))
+
+            st.success("✅ Limpieza de Excel, cruce de bases y elaboración de presupuestos completados en 2.4 segundos. Listo para exportar o auditar.")
