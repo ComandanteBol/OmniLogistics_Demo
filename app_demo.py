@@ -162,8 +162,8 @@ elif menu == "📥 4. Ingesta y Limpieza Financiera":
             df_clean['PROVEEDOR_LIMPIO'] = df_clean['PROVEEDOR_SUCIO'].str.strip().str.upper().str.replace(".", "", regex=False)
             # Limpieza financiera (quitando $ y comas)
             df_clean['VALOR_USD'] = df_clean['VALOR_USD'].astype(str).str.replace('$', '', regex=False).str.replace(',', '', regex=False).str.strip().astype(float)
-            # Estandarización de fechas
-            df_clean['FECHA'] = pd.to_datetime(df_clean['FECHA_TX'], errors='coerce').dt.strftime('%Y-%m-%d')
+            # Estandarización de fechas (Versión Blindada)
+            df_clean['FECHA'] = pd.to_datetime(df_clean['FECHA_TX'].str.strip(), errors='coerce', infer_datetime_format=True).dt.strftime('%Y-%m-%d')
 
             st.markdown("### ✨ 2. Datos Limpios, Estructurados y Conciliados")
             st.dataframe(df_clean[['FECHA', 'PROVEEDOR_LIMPIO', 'CONCEPTO', 'CATEGORIA', 'VALOR_USD']], use_container_width=True)
